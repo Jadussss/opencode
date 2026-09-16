@@ -146,4 +146,28 @@ describe("file watcher invalidation", () => {
 
     expect(refresh).toEqual([])
   })
+
+  test("refreshes the containing directory for Windows-style paths", () => {
+    const refresh: string[] = []
+
+    invalidateFromWatcher(
+      {
+        type: "file.watcher.updated",
+        properties: {
+          file: "src\\screenshots\\123.png",
+          event: "add",
+        },
+      },
+      {
+        normalize: (input) => input.replaceAll("\\", "/"),
+        hasFile: () => false,
+        loadFile: () => {},
+        node: () => undefined,
+        isDirLoaded: (path) => path === "src/screenshots",
+        refreshDir: (path) => refresh.push(path),
+      },
+    )
+
+    expect(refresh).toEqual(["src/screenshots"])
+  })
 })
