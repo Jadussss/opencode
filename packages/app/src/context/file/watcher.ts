@@ -46,7 +46,9 @@ export function invalidateFromWatcher(event: WatcherEvent, ops: WatcherOps) {
   }
   if (kind !== "add" && kind !== "unlink") return
 
-  const parent = path.split("/").slice(0, -1).join("/")
+  // Windows watchers report paths with backslashes; split on both separators
+  // so the parent directory matches the normalized tree paths.
+  const parent = path.split(/[\\/]/).slice(0, -1).join("/")
   if (!ops.isDirLoaded(parent)) return
 
   ops.refreshDir(parent)

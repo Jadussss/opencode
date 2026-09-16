@@ -168,12 +168,13 @@ describeWatcher("Watcher", () => {
     ),
   )
 
-  it.live("skips non-git roots", () =>
+  it.live("publishes events for non-git roots", () =>
     withTmp((directory) =>
       Effect.gen(function* () {
         const fs = yield* FSUtil.Service
         const file = path.join(directory, "plain.txt")
-        yield* noUpdate((event) => event.file === file, fs.writeFileString(file, "plain"))
+        yield* ready(directory)
+        yield* nextUpdate((event) => event.file === file, fs.writeFileString(file, "plain"))
       }),
     ),
   )
