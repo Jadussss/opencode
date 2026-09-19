@@ -48,8 +48,14 @@ export function invalidateFromWatcher(event: WatcherEvent, ops: WatcherOps) {
 
   // Windows watchers report paths with backslashes; split on both separators
   // so the parent directory matches the normalized tree paths.
-  const parent = path.split(/[\\/]/).slice(0, -1).join("/")
-  if (!ops.isDirLoaded(parent)) return
+  let parent = path.split(/[\\/]/).slice(0, -1).join("/")
+  // A newly created directory (or an unloaded subtree) has no loaded entry in
+  // the tree yet. Walk up to the nearest loaded ancestor; if none is loaded,
+  // fall back to the root so a fresh listing picks up the change instead of
+  // dropping the event (e.g. a new folder created while the root is loading).
+  while (parent && !ops.isDirLoaded(parent)) {
+    parent = parent.split("/").slice(0, -1).join("/")
+  }
 
   ops.refreshDir(parent)
 }
