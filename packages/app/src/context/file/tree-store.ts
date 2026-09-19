@@ -47,7 +47,13 @@ export function createFileTreeStore(options: TreeStoreOptions) {
     if (!opts?.force && current?.loaded) return Promise.resolve()
 
     const pending = inflight.get(dir)
-    if (pending) return pending
+    if (pending) {
+      // A forced refresh must not be swallowed by an in-flight load that may
+      // have started before the change (e.g. watcher event during the initial
+      // listing); otherwise the directory stays stale until the app restarts.
+      if (!opts?.force) return pending
+      return pending.finally(() => listDir(dir, { force: true }))
+    }
 
     setTree(
       "dir",
