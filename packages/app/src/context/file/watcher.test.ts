@@ -170,4 +170,52 @@ describe("file watcher invalidation", () => {
 
     expect(refresh).toEqual(["src/screenshots"])
   })
+
+  test("refreshes the nearest loaded ancestor for files in a new directory", () => {
+    const refresh: string[] = []
+
+    invalidateFromWatcher(
+      {
+        type: "file.watcher.updated",
+        properties: {
+          file: "src\\docs\\readme.md",
+          event: "add",
+        },
+      },
+      {
+        normalize: (input) => input.replaceAll("\\", "/"),
+        hasFile: () => false,
+        loadFile: () => {},
+        node: () => undefined,
+        isDirLoaded: (path) => path === "src",
+        refreshDir: (path) => refresh.push(path),
+      },
+    )
+
+    expect(refresh).toEqual(["src"])
+  })
+
+  test("refreshes the root when the new directory has no loaded ancestor", () => {
+    const refresh: string[] = []
+
+    invalidateFromWatcher(
+      {
+        type: "file.watcher.updated",
+        properties: {
+          file: "docs\\notes.md",
+          event: "add",
+        },
+      },
+      {
+        normalize: (input) => input.replaceAll("\\", "/"),
+        hasFile: () => false,
+        loadFile: () => {},
+        node: () => undefined,
+        isDirLoaded: () => false,
+        refreshDir: (path) => refresh.push(path),
+      },
+    )
+
+    expect(refresh).toEqual([""])
+  })
 })
