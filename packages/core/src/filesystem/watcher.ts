@@ -7,6 +7,7 @@ import { makeLocationNode } from "../effect/app-node"
 import { Cause, Context, Effect, Layer } from "effect"
 import { FileSystemWatcher } from "@opencode-ai/schema/filesystem-watcher"
 import path from "path"
+import { GlobalBus } from "../bus/global"
 import { Config } from "../config"
 import { EventV2 } from "../event"
 import { Flag } from "../flag/flag"
@@ -85,9 +86,20 @@ const layer = Layer.effect(
 
     const callback: ParcelWatcher.SubscribeCallback = (_error, updates) => {
       for (const update of updates) {
-        if (update.type === "create") runFork(events.publish(Event.Updated, { file: update.path, event: "add" }))
-        if (update.type === "update") runFork(events.publish(Event.Updated, { file: update.path, event: "change" }))
-        if (update.type === "delete") runFork(events.publish(Event.Updated, { file: update.path, event: "unlink" }))
+        const event = update.type === "create" ? "add" : update.type === "update" ? "change" : "unlink"
+        // The watcher service lives in the per-location graph while the SSE
+        // handlers consume the app-global EventV2 instance, so publishing only
+        // to EventV2 never reaches the renderer. Emit into GlobalBus too; it is
+        // the shared boundary consumed by EventV2Bridge and the SSE handlers.
+        GlobalBus.emit("event", {
+          directory: location.directory,
+          payload: {
+            id: EventV2.ID.create(),
+            type: Event.Updated.type,
+            properties: { file: update.path, event },
+          },
+        })
+        runFork(events.publish(Event.Updated, { file: update.path, event }))
       }
     }
 

@@ -6,6 +6,7 @@ import { ConfigProvider, Deferred, Duration, Effect, Fiber, Layer, Option, Strea
 import { Config } from "@opencode-ai/core/config"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { GlobalBus } from "@opencode-ai/core/bus/global"
 import { EventV2 } from "@opencode-ai/core/event"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Watcher } from "@opencode-ai/core/filesystem/watcher"
@@ -175,6 +176,31 @@ describeWatcher("Watcher", () => {
         const file = path.join(directory, "plain.txt")
         yield* ready(directory)
         yield* nextUpdate((event) => event.file === file, fs.writeFileString(file, "plain"))
+      }),
+    ),
+  )
+
+  it.live("publishes watcher events to the global bus", () =>
+    withTmp((directory) =>
+      Effect.gen(function* () {
+        const fs = yield* FSUtil.Service
+        const file = path.join(directory, "bus.txt")
+        yield* ready(directory)
+        const deferred = yield* Deferred.make<{ type: string; properties: unknown }>()
+        const handler = (event: { directory?: string; payload: { type?: string; properties?: unknown } }) => {
+          if (event.payload.type === "file.watcher.updated") {
+            const properties = event.payload.properties as { file?: string }
+            if (properties?.file === file) {
+              Effect.runFork(Deferred.succeed(deferred, event.payload as never))
+            }
+          }
+        }
+        GlobalBus.on("event", handler)
+        yield* Effect.addFinalizer(() => Effect.sync(() => GlobalBus.off("event", handler)))
+        yield* fs.writeFileString(file, "bus")
+        const event = yield* Deferred.await(deferred).pipe(Effect.timeoutOption("5 seconds"))
+        expect(Option.isSome(event)).toBe(true)
+        expect(Option.getOrThrow(event)).toMatchObject({ type: "file.watcher.updated" })
       }),
     ),
   )
